@@ -1,0 +1,14 @@
+PARA BACKEND:
+php artisan serve
+php artisan migrate  //migracion
+php artisan db:seed --class=SuperAdminSeeder  //super admin
+
+PARA FRONTEND:
+npx expo start
+
+Presionar: w
+
+
+ADMIN:
+Email:    admin@academico.com
+Password: Admin1234!
