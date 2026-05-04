@@ -71,11 +71,18 @@ class UsuarioController extends Controller
                 'nombre' => ['required', 'string', 'max:255'],
                 'email' => ['required', 'email', 'max:255', 'unique:usuarios,email'],
                 'password' => ['required', 'string', 'min:6'],
-                'rol' => ['required', Rule::in(
-                    $esDirector 
-                        ? ['docente', 'estudiante'] // Director solo puede crear docentes/estudiantes
+                'rol' => ['nullable', Rule::in(
+                    $esDirector
+                        ? ['docente', 'estudiante', 'centro_estudiantes']
                         : ['decano', 'director', 'centro_facultativo', 'centro_estudiantes', 'docente', 'estudiante']
                 )],
+                'roles' => ['nullable', 'array'],
+                'roles.*' => [Rule::in(
+                    $esDirector
+                        ? ['docente', 'estudiante', 'centro_estudiantes']
+                        : ['decano', 'director', 'centro_facultativo', 'centro_estudiantes', 'docente', 'estudiante']
+                )],
+                'registro_universitario' => ['nullable', 'string', 'max:20', 'unique:usuarios,registro_universitario'],
                 'carrera_id' => ['nullable', 'integer', 'exists:carreras,id'],
                 'facultad_id' => ['nullable', 'integer', 'exists:facultades,id'],
             ]);
@@ -88,6 +95,35 @@ class UsuarioController extends Controller
             }
 
             $data = $validator->validated();
+
+            // Normalizar roles: acepta 'rol' (string) o 'roles' (array)
+            $rolesArray = [];
+            if (!empty($data['roles'])) {
+                $rolesArray = array_unique($data['roles']);
+            } elseif (!empty($data['rol'])) {
+                $rolesArray = [$data['rol']];
+            }
+
+            if (empty($rolesArray)) {
+                return response()->json(['message' => 'Debes asignar al menos un rol.'], 422);
+            }
+
+            // RU requerido si es estudiante
+            $esEstudiante = in_array('estudiante', $rolesArray);
+            if ($esEstudiante && empty($data['registro_universitario'])) {
+                return response()->json([
+                    'message' => 'Error de validacion.',
+                    'errors' => ['registro_universitario' => ['El RU es obligatorio para estudiantes.']],
+                ], 422);
+            }
+
+            // Docente es incompatible con estudiante y centro_estudiantes
+            if (in_array('docente', $rolesArray) && count($rolesArray) > 1) {
+                return response()->json([
+                    'message' => 'Error de validacion.',
+                    'errors' => ['roles' => ['El rol docente no puede combinarse con otros roles.']],
+                ], 422);
+            }
             
             // Si es director, verificar que no intente asignar a otra carrera
             if ($esDirector) {
@@ -100,22 +136,25 @@ class UsuarioController extends Controller
                 }
             }
 
-            $usuario = DB::transaction(function () use ($data) {
+            $usuario = DB::transaction(function () use ($data, $rolesArray) {
                 $usuario = Usuario::create([
-                    'nombre' => $data['nombre'],
-                    'email' => $data['email'],
-                    'password' => Hash::make($data['password']),
-                    'esta_verificado' => false,
-                    'carrera_id' => $data['carrera_id'] ?? null,
-                    'facultad_id' => $data['facultad_id'] ?? null,
+                    'nombre'                  => $data['nombre'],
+                    'email'                   => $data['email'],
+                    'registro_universitario'  => $data['registro_universitario'] ?? null,
+                    'password'                => Hash::make($data['password']),
+                    'esta_verificado'         => false,
+                    'carrera_id'              => $data['carrera_id'] ?? null,
+                    'facultad_id'             => $data['facultad_id'] ?? null,
                 ]);
 
-                RolUsuario::create([
-                    'usuario_id' => $usuario->id,
-                    'rol' => $data['rol'],
-                    'carrera_id' => $data['carrera_id'] ?? null,
-                    'facultad_id' => $data['facultad_id'] ?? null,
-                ]);
+                foreach ($rolesArray as $rol) {
+                    RolUsuario::create([
+                        'usuario_id' => $usuario->id,
+                        'rol'        => $rol,
+                        'carrera_id' => $data['carrera_id'] ?? null,
+                        'facultad_id'=> $data['facultad_id'] ?? null,
+                    ]);
+                }
 
                 return $usuario->load(['rolesUsuario', 'carrera', 'facultad']);
             });
@@ -169,13 +208,16 @@ class UsuarioController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
-                'nombre' => ['required', 'string', 'max:255'],
-                'email' => ['required', 'email', 'max:255', Rule::unique('usuarios', 'email')->ignore($usuario->id)],
-                'password' => ['nullable', 'string', 'min:6'],
-                'rol' => ['nullable', Rule::in(['decano', 'director', 'centro_facultativo', 'centro_estudiantes', 'docente', 'estudiante'])],
-                'esta_verificado' => ['nullable', 'boolean'],
-                'carrera_id' => ['nullable', 'integer', 'exists:carreras,id'],
-                'facultad_id' => ['nullable', 'integer', 'exists:facultades,id'],
+                'nombre'                 => ['required', 'string', 'max:255'],
+                'email'                  => ['required', 'email', 'max:255', Rule::unique('usuarios', 'email')->ignore($usuario->id)],
+                'password'               => ['nullable', 'string', 'min:6'],
+                'rol'                    => ['nullable', Rule::in(['decano', 'director', 'centro_facultativo', 'centro_estudiantes', 'docente', 'estudiante'])],
+                'roles'                  => ['nullable', 'array'],
+                'roles.*'                => [Rule::in(['decano', 'director', 'centro_facultativo', 'centro_estudiantes', 'docente', 'estudiante'])],
+                'registro_universitario' => ['nullable', 'string', 'max:20', Rule::unique('usuarios', 'registro_universitario')->ignore($usuario->id)],
+                'esta_verificado'        => ['nullable', 'boolean'],
+                'carrera_id'             => ['nullable', 'integer', 'exists:carreras,id'],
+                'facultad_id'            => ['nullable', 'integer', 'exists:facultades,id'],
             ]);
 
             if ($validator->fails()) {
@@ -189,33 +231,36 @@ class UsuarioController extends Controller
 
             $usuario = DB::transaction(function () use ($data, $usuario) {
                 $payload = [
-                    'nombre' => $data['nombre'],
-                    'email' => $data['email'],
-                    'esta_verificado' => $data['esta_verificado'] ?? $usuario->esta_verificado,
-                    'carrera_id' => $data['carrera_id'] ?? null,
-                    'facultad_id' => $data['facultad_id'] ?? null,
+                    'nombre'                 => $data['nombre'],
+                    'email'                  => $data['email'],
+                    'registro_universitario' => $data['registro_universitario'] ?? $usuario->registro_universitario,
+                    'esta_verificado'        => $data['esta_verificado'] ?? $usuario->esta_verificado,
+                    'carrera_id'             => $data['carrera_id'] ?? null,
+                    'facultad_id'            => $data['facultad_id'] ?? null,
                 ];
 
-                if (! empty($data['password'])) {
+                if (!empty($data['password'])) {
                     $payload['password'] = Hash::make($data['password']);
                 }
 
                 $usuario->update($payload);
 
-                if (! empty($data['rol'])) {
-                    $rolAsignado = $usuario->roles()->first();
+                // Normalizar roles
+                $rolesArray = [];
+                if (!empty($data['roles'])) {
+                    $rolesArray = array_unique($data['roles']);
+                } elseif (!empty($data['rol'])) {
+                    $rolesArray = [$data['rol']];
+                }
 
-                    if ($rolAsignado) {
-                        $rolAsignado->update([
-                            'rol' => $data['rol'],
-                            'carrera_id' => $data['carrera_id'] ?? null,
-                            'facultad_id' => $data['facultad_id'] ?? null,
-                        ]);
-                    } else {
+                if (!empty($rolesArray)) {
+                    // Reemplazar todos los roles existentes
+                    $usuario->rolesUsuario()->delete();
+                    foreach ($rolesArray as $rol) {
                         RolUsuario::create([
-                            'usuario_id' => $usuario->id,
-                            'rol' => $data['rol'],
-                            'carrera_id' => $data['carrera_id'] ?? null,
+                            'usuario_id'  => $usuario->id,
+                            'rol'         => $rol,
+                            'carrera_id'  => $data['carrera_id'] ?? null,
                             'facultad_id' => $data['facultad_id'] ?? null,
                         ]);
                     }

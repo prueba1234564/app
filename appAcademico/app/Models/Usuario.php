@@ -21,6 +21,7 @@ class Usuario extends Authenticatable
     protected $fillable = [
         'nombre',
         'email',
+        'registro_universitario',
         'password',
         'matricula_pdf',
         'esta_verificado',
@@ -94,5 +95,17 @@ class Usuario extends Authenticatable
     public function notificacionesLeidas(): HasMany
     {
         return $this->hasMany(NotificacionLeida::class, 'usuario_id');
+    }
+
+    public function ofertasDocente(): HasMany
+    {
+        return $this->hasMany(MateriaPeriodo::class, 'docente_id');
+    }
+
+    public function materiasPeriodo(): BelongsToMany
+    {
+        return $this->belongsToMany(Materia::class, 'materia_periodo', 'docente_id', 'materia_id')
+            ->withPivot('periodo_id', 'estado', 'observaciones')
+            ->withTimestamps();
     }
 }

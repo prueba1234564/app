@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notificacion;
+use App\Models\NotificacionLeida;
 use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,8 +20,9 @@ class NotificacionController extends Controller
         $carreraId = $this->getCarreraId($usuario);
 
         $query = Notificacion::query()
-            ->select('id', 'titulo', 'cuerpo', 'rol_destino', 'rol_destino_array', 'ruta_archivo', 'enviado_por', 'carrera_id', 'carrera_ids', 'facultad_id', 'created_at', 'updated_at')
-            ->with(['emisor:id,nombre,email', 'carrera:id,nombre'])
+            ->select('id', 'titulo', 'cuerpo', 'rol_destino', 'rol_destino_array', 'ruta_archivo', 'enviado_por', 'carrera_id', 'carrera_ids', 'facultad_id', 'actividad_id', 'created_at', 'updated_at')
+            ->with(['emisor:id,nombre,email', 'carrera:id,nombre', 'actividad:id,titulo,categoria,fecha_entrega,ruta_archivo'])
+            ->with(['notificacionesLeidas' => fn ($q) => $q->where('usuario_id', $usuario->id)->select('id', 'notificacion_id', 'usuario_id', 'leido_en')])
             ->latest();
 
         if ($rolActivo !== 'decano') {
@@ -35,6 +37,9 @@ class NotificacionController extends Controller
             } else {
                 $query->whereIn('rol_destino', ['todos', 'docentes']);
             }
+
+            // Nunca mostrar en recibidas las notificaciones que el propio usuario envió
+            $query->where('enviado_por', '!=', $usuario->id);
 
             // Filter by career: show general notifications (no career filter) OR
             // notifications matching user's specific career (single or multiple)
@@ -76,7 +81,7 @@ class NotificacionController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $query->take(50)->get(),
+            'data' => $this->appendReadState($query->take(50)->get()),
         ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 
@@ -87,17 +92,57 @@ class NotificacionController extends Controller
 
     public function enviadas(Request $request): JsonResponse
     {
-        $notificaciones = Notificacion::query()
-            ->select('id', 'titulo', 'cuerpo', 'rol_destino', 'rol_destino_array', 'ruta_archivo', 'enviado_por', 'carrera_id', 'carrera_ids', 'facultad_id', 'created_at', 'updated_at')
-            ->with(['emisor:id,nombre,email', 'carrera:id,nombre'])
+        $query = Notificacion::query()
+            ->select('id', 'titulo', 'cuerpo', 'rol_destino', 'rol_destino_array', 'ruta_archivo', 'enviado_por', 'carrera_id', 'carrera_ids', 'facultad_id', 'actividad_id', 'created_at', 'updated_at')
+            ->with(['emisor:id,nombre,email', 'carrera:id,nombre', 'actividad:id,titulo,categoria,fecha_entrega,ruta_archivo'])
+            ->with(['notificacionesLeidas' => fn ($q) => $q->where('usuario_id', $request->user()->id)->select('id', 'notificacion_id', 'usuario_id', 'leido_en')])
             ->where('enviado_por', $request->user()->id)
-            ->latest()
-            ->get();
+            ->latest();
+
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('created_at', '>=', $request->fecha_desde);
+        }
+
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('created_at', '<=', $request->fecha_hasta);
+        }
 
         return response()->json([
             'success' => true,
-            'data' => $notificaciones,
+            'data' => $this->appendReadState($query->take(50)->get()),
         ]);
+    }
+
+    public function marcarComoLeida(Request $request, int $id): JsonResponse
+    {
+        $notificacion = Notificacion::find($id);
+
+        if (! $notificacion) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Notificación no encontrada.',
+            ], 404, [], JSON_UNESCAPED_UNICODE);
+        }
+
+        $leida = NotificacionLeida::firstOrCreate(
+            [
+                'notificacion_id' => $notificacion->id,
+                'usuario_id' => $request->user()->id,
+            ],
+            [
+                'leido_en' => now(),
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notificación marcada como leída.',
+            'data' => [
+                'notificacion_id' => $notificacion->id,
+                'leida' => true,
+                'leido_en' => $leida->leido_en,
+            ],
+        ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 
     public function store(Request $request): JsonResponse
@@ -133,6 +178,11 @@ class NotificacionController extends Controller
         if ($rolActivo === 'docente') {
             $data['rol_destino'] = 'estudiantes';
             $data['rol_destino_array'] = null;
+        }
+
+        if ($rolActivo === 'director') {
+            $data['carrera_id'] = null;
+            $data['carrera_ids'] = array_filter([$this->getCarreraId($usuario)]);
         }
 
         $data['enviado_por'] = $usuario->id;
@@ -207,6 +257,13 @@ class NotificacionController extends Controller
             ], 404);
         }
 
+        if ($this->isDirector($request) && (int) $notificacion->enviado_por !== (int) $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permiso para editar esta notificacion.',
+            ], 403);
+        }
+
         $data = $request->validate([
             'titulo' => ['required', 'string', 'max:255'],
             'cuerpo' => ['required', 'string'],
@@ -223,6 +280,11 @@ class NotificacionController extends Controller
         // Ensure rol_destino_array is null if empty
         if (!isset($data['rol_destino_array']) || empty($data['rol_destino_array'])) {
             $data['rol_destino_array'] = null;
+        }
+
+        if ($this->isDirector($request)) {
+            $data['carrera_id'] = null;
+            $data['carrera_ids'] = array_filter([$this->getCarreraId($request->user())]);
         }
 
         // Handle file upload during update
@@ -286,6 +348,13 @@ class NotificacionController extends Controller
 
         \Log::info('Notificación encontrada, eliminando:', ['id' => $id, 'titulo' => $notificacion->titulo]);
         
+        if ($this->isDirector($request) && (int) $notificacion->enviado_por !== (int) $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permiso para eliminar esta notificacion.',
+            ], 403);
+        }
+
         $notificacion->delete(); // Soft delete
         
         \Log::info('Notificación eliminada (soft delete):', ['id' => $id]);
@@ -308,5 +377,25 @@ class NotificacionController extends Controller
             ?? $usuario->rolesUsuario->first(fn ($rolUsuario) => $rolUsuario->carrera_id);
 
         return $usuario->carrera_id ?? $rolConCarrera?->carrera_id;
+    }
+
+    private function isDirector(Request $request): bool
+    {
+        $habilidades = $request->user()?->currentAccessToken()?->abilities ?? [];
+
+        return collect($habilidades)->contains('director');
+    }
+
+    private function appendReadState($notificaciones)
+    {
+        return $notificaciones->map(function (Notificacion $notificacion) {
+            $lectura = $notificacion->notificacionesLeidas->first();
+
+            $notificacion->setAttribute('leida', (bool) $lectura);
+            $notificacion->setAttribute('leido_en', $lectura?->leido_en);
+            $notificacion->unsetRelation('notificacionesLeidas');
+
+            return $notificacion;
+        });
     }
 }

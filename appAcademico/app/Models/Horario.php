@@ -22,8 +22,6 @@ class Horario extends Model
 
     protected $casts = [
         'dia' => 'string',
-        'hora_inicio' => 'datetime:H:i:s',
-        'hora_fin' => 'datetime:H:i:s',
     ];
 
     public function materia(): BelongsTo

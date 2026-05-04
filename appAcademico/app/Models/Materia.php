@@ -60,4 +60,16 @@ class Materia extends Model
     {
         return $this->hasMany(DocenteMateria::class, 'materia_id');
     }
+
+    public function ofertas(): HasMany
+    {
+        return $this->hasMany(MateriaPeriodo::class, 'materia_id');
+    }
+
+    public function periodos(): BelongsToMany
+    {
+        return $this->belongsToMany(Periodo::class, 'materia_periodo', 'materia_id', 'periodo_id')
+            ->withPivot('docente_id', 'estado', 'observaciones')
+            ->withTimestamps();
+    }
 }

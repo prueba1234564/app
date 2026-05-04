@@ -219,35 +219,44 @@ class ActividadController extends Controller
     }
 
     /**
-     * Crear notificación automática cuando se crea una actividad
+     * Crear notificación automática cuando se crea una actividad.
+     * Respeta el rol_destino de la actividad:
+     *   - 'todos'       → notifica a todos
+     *   - 'docentes'    → notifica a docentes y director
+     *   - 'estudiantes' → notifica solo a estudiantes
      */
     private function crearNotificacionActividad(Actividad $actividad, $usuario): void
     {
         try {
-            $tipo = match($actividad->categoria) {
-                'parcial' => 'evaluacion',
-                'tarea' => 'tarea',
-                'proyecto' => 'proyecto',
-                'evento' => 'evento_academico',
-                'comunicado' => 'comunicado',
-                default => 'informacion',
-            };
-
             $carreraInfo = $actividad->carrera ? " - {$actividad->carrera->nombre}" : '';
-            $fechaInfo = $actividad->fecha_entrega 
-                ? " | Fecha: " . $actividad->fecha_entrega->format('d/m/Y') 
+            $fechaInfo = $actividad->fecha_entrega
+                ? " | Fecha: " . $actividad->fecha_entrega->format('d/m/Y')
                 : '';
 
+            $rolDestino = match ($actividad->rol_destino) {
+                'todos'       => 'todos',
+                'docentes'    => 'docentes',
+                'estudiantes' => 'estudiantes',
+                default       => 'todos',
+            };
+
+            // Cuando incluye docentes, también llega al director
+            $rolDestinoArray = match ($rolDestino) {
+                'docentes' => ['docentes', 'director'],
+                'todos'    => ['todos'],
+                default    => null,
+            };
+
             Notificacion::create([
-                'titulo' => $actividad->titulo,
-                'cuerpo' => $actividad->descripcion ?? "Nueva actividad: {$actividad->titulo}{$carreraInfo}{$fechaInfo}",
-                'enviado_por' => $usuario->id,
-                'rol_destino' => 'estudiantes',
-                'carrera_id' => $actividad->carrera_id,
-                'actividad_id' => $actividad->id,
+                'titulo'            => $actividad->titulo,
+                'cuerpo'            => $actividad->descripcion ?? "Nueva actividad: {$actividad->titulo}{$carreraInfo}{$fechaInfo}",
+                'enviado_por'       => $usuario->id,
+                'rol_destino'       => $rolDestino,
+                'rol_destino_array' => $rolDestinoArray,
+                'carrera_id'        => $actividad->carrera_id,
+                'actividad_id'      => $actividad->id,
             ]);
         } catch (Throwable $e) {
-            // No lanzar error si falla la notificación
             \Log::error('Error creando notificación de actividad: ' . $e->getMessage());
         }
     }
