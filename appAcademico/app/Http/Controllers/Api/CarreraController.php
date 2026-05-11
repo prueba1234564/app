@@ -23,42 +23,39 @@ class CarreraController extends Controller
         return $codigo ?: 'CAR';
     }
 
-    private function getDirectorCarrera(string $carreraNombre): array
-    {
-        $directores = [
-            'Ingeniería en Sistemas' => ['nombre' => 'Dr. Roberto Sánchez', 'color' => 'purple'],
-            'Ingeniería Civil' => ['nombre' => 'Dr. Carlos Ruiz', 'color' => 'purple'],
-            'Ingeniería Industrial' => ['nombre' => 'Dra. María González', 'color' => 'purple'],
-            'Ingeniería Eléctrica' => ['nombre' => 'Dr. Javier Mendoza', 'color' => 'purple'],
-            'Ingeniería Mecánica' => ['nombre' => 'Dr. Andrés Vega', 'color' => 'purple'],
-            'Derecho' => ['nombre' => 'Dra. Patricia Flores', 'color' => 'purple'],
-            'Medicina' => ['nombre' => 'Dra. Ana Martínez', 'color' => 'purple'],
-            'Psicología' => ['nombre' => 'Dra. Carmen Silva', 'color' => 'purple'],
-        ];
-
-        return $directores[$carreraNombre] ?? ['nombre' => 'Por asignar', 'color' => 'gray'];
-    }
-
     public function index(): JsonResponse
     {
         try {
-            $carreras = Carrera::with(['facultad', 'materias', 'usuarios'])->get();
+            $carreras = Carrera::with([
+                'facultad',
+                'materias',
+                'usuarios.rolesUsuario',
+            ])->get();
             
             $carrerasEnriquecidas = $carreras->map(function ($carrera) {
-                $director = $this->getDirectorCarrera($carrera->nombre);
-                
+
+                // Contar solo usuarios con rol 'estudiante'
+                $totalEstudiantes = $carrera->usuarios
+                    ->filter(fn ($u) => $u->rolesUsuario->contains('rol', 'estudiante'))
+                    ->count();
+
+                // Buscar el director real de la carrera
+                $directorUsuario = $carrera->usuarios
+                    ->first(fn ($u) => $u->rolesUsuario->contains('rol', 'director'));
+
+                $directorNombre = $directorUsuario?->nombre ?? 'Por asignar';
+
                 return [
-                    'id' => $carrera->id,
-                    'nombre' => $carrera->nombre,
-                    'codigo' => $this->getCodigoCarrera($carrera->nombre),
-                    'facultad' => $carrera->facultad,
-                    'facultad_id' => $carrera->facultad_id,
-                    'director' => $director['nombre'],
-                    'director_color' => $director['color'],
-                    'total_estudiantes' => $carrera->usuarios->count(),
-                    'total_materias' => $carrera->materias->count(),
-                    'created_at' => $carrera->created_at,
-                    'updated_at' => $carrera->updated_at,
+                    'id'               => $carrera->id,
+                    'nombre'           => $carrera->nombre,
+                    'codigo'           => $this->getCodigoCarrera($carrera->nombre),
+                    'facultad'         => $carrera->facultad,
+                    'facultad_id'      => $carrera->facultad_id,
+                    'director'         => $directorNombre,
+                    'total_estudiantes'=> $totalEstudiantes,
+                    'total_materias'   => $carrera->materias->count(),
+                    'created_at'       => $carrera->created_at,
+                    'updated_at'       => $carrera->updated_at,
                 ];
             });
 

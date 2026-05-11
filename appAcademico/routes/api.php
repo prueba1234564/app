@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\RegistroController;
 use App\Http\Controllers\Api\CarreraController;
 use App\Http\Controllers\Api\DocenteController;
 use App\Http\Controllers\Api\FacultadController;
@@ -16,13 +17,19 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/registro', [RegistroController::class, 'registro']);
     Route::post('/seleccionar-rol', [AuthController::class, 'seleccionarRol']);
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
     });
 });
+
+// Rutas públicas para el formulario de registro de estudiantes
+Route::get('/publico/carreras', [CarreraController::class, 'index']);
 
 Route::middleware(['auth:sanctum', 'rol:decano'])->group(function () {
     Route::apiResource('facultades', FacultadController::class);
@@ -67,18 +74,20 @@ Route::middleware(['auth:sanctum', 'rol:docente'])->group(function () {
     Route::get('/docente/historial', [DocenteController::class, 'historial']);
 });
 
-// Actividades: decano, docente y director pueden crear/editar/eliminar
-// El controller valida internamente qué puede hacer cada rol
-Route::middleware(['auth:sanctum', 'rol:decano,docente,director'])->group(function () {
+// Lectura de actividades: todos los roles autenticados pueden ver
+Route::middleware(['auth:sanctum', 'rol:decano,docente,director,estudiante,centro_estudiantes,centro_facultativo'])->group(function () {
     Route::get('/actividades', [ActividadController::class, 'index']);
     Route::get('/actividades/{id}', [ActividadController::class, 'show']);
+});
+
+// Escritura de actividades: solo roles administrativos/docentes
+Route::middleware(['auth:sanctum', 'rol:decano,docente,director,centro_estudiantes,centro_facultativo'])->group(function () {
     Route::post('/actividades', [ActividadController::class, 'store']);
     Route::put('/actividades/{id}', [ActividadController::class, 'update']);
     Route::post('/actividades/{id}', [ActividadController::class, 'update']); // FormData
     Route::delete('/actividades/{id}', [ActividadController::class, 'destroy']);
 });
-
-Route::middleware(['auth:sanctum', 'rol:decano,docente,director'])->group(function () {
+Route::middleware(['auth:sanctum', 'rol:decano,docente,director,centro_estudiantes,centro_facultativo'])->group(function () {
     Route::post('/notificaciones', [NotificacionController::class, 'store']);
 });
 
@@ -92,6 +101,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/usuarios/cambiar-password', [AuthController::class, 'changePassword']);
 
     Route::get('/estudiante/historial', [DocenteController::class, 'historialEstudiante']);
+    Route::get('/estudiante/materias-carrera', [InscripcionController::class, 'materiasCarrera']);
+    Route::post('/estudiante/inscribirse', [InscripcionController::class, 'inscribirse']);
+    Route::post('/estudiante/desinscribirse', [InscripcionController::class, 'desinscribirse']);
+    Route::post('/estudiante/actividades/{id}/completar', [ActividadController::class, 'completar']);
+    Route::delete('/estudiante/actividades/{id}/completar', [ActividadController::class, 'descompletar']);
 
     Route::get('/periodos', [PeriodoController::class, 'index']);
     Route::get('/periodos/activo', [PeriodoController::class, 'activo']);

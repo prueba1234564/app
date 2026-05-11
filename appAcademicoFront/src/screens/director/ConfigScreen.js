@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons'; // Iconos vectoriales
 import { useAuth } from '../../context/AuthContext';
 // import styles from './styles'; // <-- Comentado para usar estilos en línea
 import BottomNav from '../../components/BottomNav';
+import RolSwitcher from '../../components/RolSwitcher';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../api/axios';
@@ -189,6 +190,9 @@ export default function ConfigScreen({ navigation }) {
             </View>
           </View>
         </View>
+
+        {/* Roles disponibles */}
+        <RolSwitcher />
 
         {/* Cambiar contraseña */}
         <View style={styles.section}>

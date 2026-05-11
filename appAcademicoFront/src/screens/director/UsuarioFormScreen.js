@@ -20,7 +20,7 @@ import getErrorMessage from '../../utils/apiError';
 const ROLE_OPTIONS = [
   { label: 'Docente', value: 'docente', icon: 'person-outline', color: '#0f766e' },
   { label: 'Estudiante', value: 'estudiante', icon: 'school-outline', color: '#4f46e5' },
-  { label: 'Centro de Estudiantes', value: 'centro_estudiantes', icon: 'people-outline', color: '#7c3aed' },
+  { label: 'Centro de Estudiantes', value: 'centro_estudiantes', icon: 'people-outline', color: '#0f172a' },
 ];
 
 const normalizeRoleValue = (value) => {
@@ -206,8 +206,7 @@ export default function UsuarioFormScreen({ navigation, route }) {
                 style={fStyles.input}
                 value={ru}
                 onChangeText={setRu}
-                keyboardType="default"
-                autoCapitalize="characters"
+                keyboardType="numeric"
                 maxLength={20}
               />
             </>

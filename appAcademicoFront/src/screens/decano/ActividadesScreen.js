@@ -36,7 +36,7 @@ const ROLES_DESTINO = [
 
 const getCategoriaStyle = (categoria) => {
   const styles = {
-    evento: { bg: '#ede9fe', text: '#7c3aed', icon: 'calendar' },
+    evento: { bg: '#ede9fe', text: '#0f172a', icon: 'calendar' },
     comunicado: { bg: '#dbeafe', text: '#2563eb', icon: 'megaphone' },
     convocatoria: { bg: '#d1fae5', text: '#059669', icon: 'people' },
     fecha_importante: { bg: '#fef3c7', text: '#d97706', icon: 'time' },

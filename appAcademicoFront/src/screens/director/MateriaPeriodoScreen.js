@@ -324,7 +324,12 @@ export default function MateriaPeriodoScreen({ navigation }) {
     if (!id) return 'Sin docente asignado';
     return docentes.find((d) => d.id === id)?.nombre ?? 'Sin docente asignado';
   };
-  const materiasDisponibles = materias.filter((m) => !ofertas.some((o) => o.materia_id === m.id));
+  // Una materia puede aparecer varias veces si tiene distintos paralelos.
+  // Solo la excluimos si ya existe SIN paralelo (para evitar duplicados sin sentido).
+  const materiasDisponibles = materias.filter((m) => {
+    const sinParalelo = ofertas.some((o) => o.materia_id === m.id && !o.paralelo);
+    return !sinParalelo;
+  });
   const isPeriodoActivo = !!periodo?.activo;
 
   // ── Inscripciones ─────────────────────────────────────────
@@ -438,7 +443,7 @@ export default function MateriaPeriodoScreen({ navigation }) {
             <Text style={styles.horarioBtnText}>Horarios ({item.horarios?.length ?? 0})</Text>
           </Pressable>
           <Pressable style={styles.inscripcionBtn} onPress={() => abrirInscripciones(item)}>
-            <Ionicons name="people-outline" size={15} color="#7c3aed" />
+            <Ionicons name="people-outline" size={15} color="#0f172a" />
             <Text style={styles.inscripcionBtnText}>Alumnos</Text>
           </Pressable>
           {isPeriodoActivo && (
@@ -1061,7 +1066,7 @@ const styles = StyleSheet.create({
   readOnlyNoticeText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   // Inscripciones
   inscripcionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#f5f3ff', paddingVertical: 10, borderRadius: 12 },
-  inscripcionBtnText: { fontSize: 13, fontWeight: '600', color: '#7c3aed' },
+  inscripcionBtnText: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
   estudianteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   estudianteAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center' },
   estudianteAvatarText: { fontSize: 15, fontWeight: '700', color: '#16a34a' },

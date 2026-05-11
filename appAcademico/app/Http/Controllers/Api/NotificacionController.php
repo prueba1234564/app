@@ -73,15 +73,19 @@ class NotificacionController extends Controller
             }
         }
         
-        \Log::info('Filtros aplicados:', [
-            'fecha_desde' => $request->fecha_desde,
-            'fecha_hasta' => $request->fecha_hasta,
-            'rol_activo' => $rolActivo,
-        ]);
+        $perPage = min((int) ($request->query('per_page', 20)), 50);
+        $paginated = $query->paginate($perPage);
+        $paginated->getCollection()->transform(fn ($n) => $this->appendReadState(collect([$n]))->first());
 
         return response()->json([
             'success' => true,
-            'data' => $this->appendReadState($query->take(50)->get()),
+            'data' => $paginated->items(),
+            'meta' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+            ],
         ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 
@@ -107,9 +111,19 @@ class NotificacionController extends Controller
             $query->whereDate('created_at', '<=', $request->fecha_hasta);
         }
 
+        $perPage = min((int) ($request->query('per_page', 20)), 50);
+        $paginated = $query->paginate($perPage);
+        $paginated->getCollection()->transform(fn ($n) => $this->appendReadState(collect([$n]))->first());
+
         return response()->json([
             'success' => true,
-            'data' => $this->appendReadState($query->take(50)->get()),
+            'data' => $paginated->items(),
+            'meta' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'per_page'     => $paginated->perPage(),
+                'total'        => $paginated->total(),
+            ],
         ]);
     }
 
@@ -147,8 +161,7 @@ class NotificacionController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        \Log::info('Request completo:', ['all' => $request->all(), 'input' => $request->input()]);
-        \Log::info('rol_destino_array específico:', ['value' => $request->input('rol_destino_array'), 'has' => $request->has('rol_destino_array')]);
+
         
         $data = $request->validate([
             'titulo' => ['required', 'string', 'max:255'],
@@ -194,7 +207,6 @@ class NotificacionController extends Controller
             $data['carrera_ids'] = null;
         }
         
-        \Log::info('Datos validados:', $data);
         
         // Ensure rol_destino_array is always set (null if not provided or empty)
         if (!isset($data['rol_destino_array'])) {
@@ -203,34 +215,14 @@ class NotificacionController extends Controller
             $data['rol_destino_array'] = null;
         }
         
-        \Log::info('Datos después de procesar rol_destino_array:', ['rol_destino_array' => $data['rol_destino_array']]);
-
         if ($request->hasFile('archivo')) {
             $file = $request->file('archivo');
-            \Log::info('Archivo recibido:', [
-                'name' => $file->getClientOriginalName(),
-                'size' => $file->getSize(),
-                'mime' => $file->getMimeType(),
-            ]);
             $path = $file->storePublicly('notificaciones', 'public');
-            // Generar URL completa usando asset() para incluir el dominio del backend
             $data['ruta_archivo'] = asset('storage/' . $path);
-            \Log::info('Archivo guardado en:', ['path' => $path, 'url' => $data['ruta_archivo']]);
-        } else {
-            \Log::info('No se recibió archivo en la petición');
         }
 
         try {
             $notificacion = Notificacion::create($data);
-            
-            \Log::info('Notificación creada:', [
-                'id' => $notificacion->id,
-                'titulo' => $notificacion->titulo,
-                'ruta_archivo' => $notificacion->ruta_archivo,
-                'rol_destino' => $notificacion->rol_destino,
-                'rol_destino_array' => $notificacion->rol_destino_array,
-                'carrera_ids' => $notificacion->carrera_ids,
-            ]);
 
             return response()->json([
                 'success' => true,
@@ -331,23 +323,15 @@ class NotificacionController extends Controller
 
     public function destroy(int $id, Request $request): JsonResponse
     {
-        \Log::info('================== DELETE NOTIFICACION ==================');
-        \Log::info('Intentando eliminar notificación:', ['id' => $id]);
-        \Log::info('Usuario autenticado:', ['user_id' => $request->user()?->id, 'email' => $request->user()?->email]);
-        \Log::info('Habilidades del token:', ['abilities' => $request->user()?->currentAccessToken()?->abilities]);
-        
         $notificacion = Notificacion::find($id);
 
         if (! $notificacion) {
-            \Log::info('Notificación no encontrada:', ['id' => $id]);
             return response()->json([
                 'success' => false,
                 'message' => 'Notificación no encontrada.',
             ], 404);
         }
 
-        \Log::info('Notificación encontrada, eliminando:', ['id' => $id, 'titulo' => $notificacion->titulo]);
-        
         if ($this->isDirector($request) && (int) $notificacion->enviado_por !== (int) $request->user()->id) {
             return response()->json([
                 'success' => false,
@@ -355,9 +339,7 @@ class NotificacionController extends Controller
             ], 403);
         }
 
-        $notificacion->delete(); // Soft delete
-        
-        \Log::info('Notificación eliminada (soft delete):', ['id' => $id]);
+        $notificacion->delete();
 
         return response()->json([
             'success' => true,

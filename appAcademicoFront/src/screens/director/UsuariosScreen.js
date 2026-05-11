@@ -24,7 +24,7 @@ const ROLES = [
   { key: 'todos', label: 'Todos', color: '#4f46e5' },
   { key: 'docente', label: 'Docentes', color: '#0f766e' },
   { key: 'estudiante', label: 'Estudiantes', color: '#be123c' },
-  { key: 'centro_estudiantes', label: 'C. Estudiantes', color: '#7c3aed' },
+  { key: 'centro_estudiantes', label: 'C. Estudiantes', color: '#0f172a' },
 ];
 
 const formatRoles = (roles) => {

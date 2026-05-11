@@ -32,6 +32,15 @@ class AuthController extends Controller
             ->firstOrFail();
         $roles = $usuario->rolesUsuario->pluck('rol')->unique()->values();
 
+        // Bloquear estudiantes no verificados
+        $esEstudiante = $roles->contains('estudiante') && $roles->count() === 1;
+        if ($esEstudiante && ! $usuario->esta_verificado) {
+            return response()->json([
+                'message' => 'Tu cuenta aún no ha sido verificada. Asegúrate de que tu RU aparezca en el PDF de matrícula que subiste, o contacta a tu director de carrera.',
+                'no_verificado' => true,
+            ], 403);
+        }
+
         $usuario->tokens()->delete();
 
         if ($roles->count() === 1) {
@@ -89,6 +98,74 @@ class AuthController extends Controller
             'token' => $token,
             'usuario' => $this->formatearUsuario($usuario),
             'rol_activo' => $data['rol'],
+        ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $usuario = Usuario::where('email', $request->email)->first();
+
+        // Siempre responder igual para no revelar si el email existe
+        if (!$usuario) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Si el correo existe, recibirás instrucciones para restablecer tu contraseña.',
+            ]);
+        }
+
+        // Generar token temporal (6 dígitos)
+        $codigo = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $expira = now()->addMinutes(15);
+
+        \Illuminate\Support\Facades\Cache::put(
+            'reset_password_' . $usuario->id,
+            ['codigo' => $codigo, 'expira' => $expira],
+            $expira
+        );
+
+        Log::info("Código de recuperación para {$usuario->email}: {$codigo}");
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Si el correo existe, recibirás instrucciones para restablecer tu contraseña.',
+            // En desarrollo devolvemos el código directamente
+            'dev_codigo' => app()->environment('local') ? $codigo : null,
+            'usuario_id' => app()->environment('local') ? $usuario->id : null,
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate([
+            'usuario_id' => 'required|integer',
+            'codigo'     => 'required|string|size:6',
+            'password'   => 'required|string|min:6|confirmed',
+        ]);
+
+        $cached = \Illuminate\Support\Facades\Cache::get('reset_password_' . $data['usuario_id']);
+
+        if (!$cached || $cached['codigo'] !== $data['codigo'] || now()->isAfter($cached['expira'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Código inválido o expirado.',
+            ], 422);
+        }
+
+        $usuario = Usuario::find($data['usuario_id']);
+        if (!$usuario) {
+            return response()->json(['success' => false, 'message' => 'Usuario no encontrado.'], 404);
+        }
+
+        $usuario->password = \Illuminate\Support\Facades\Hash::make($data['password']);
+        $usuario->save();
+
+        \Illuminate\Support\Facades\Cache::forget('reset_password_' . $data['usuario_id']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Contraseña restablecida correctamente.',
         ]);
     }
 

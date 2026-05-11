@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 import * as authService from '../services/authService';
+import { setUnauthorizedHandler } from '../api/axios';
 
 const AuthContext = createContext(null);
 
@@ -59,6 +60,8 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingRoles, setPendingRoles] = useState([]);
+  // Todos los roles del usuario (independiente del rol activo)
+  const [todosLosRoles, setTodosLosRoles] = useState([]);
 
   const hydrateAuthState = async () => {
     try {
@@ -73,9 +76,11 @@ export function AuthProvider({ children }) {
       const me = await authService.getMe();
       const user = extractUser(me);
       const activeRole = extractActiveRole(me);
+      const allRoles = extractRoles(me).map(normalizeRoleName).filter(Boolean);
 
       setUsuario(user);
       setRol(activeRole);
+      setTodosLosRoles(allRoles);
       setPendingRoles([]);
     } catch (_error) {
       await authService.logout();
@@ -83,6 +88,7 @@ export function AuthProvider({ children }) {
       setRol('');
       setToken(null);
       setPendingRoles([]);
+      setTodosLosRoles([]);
     } finally {
       setIsLoading(false);
     }
@@ -97,9 +103,11 @@ export function AuthProvider({ children }) {
     const user = extractUser(response);
     const availableRoles = extractRoles(response);
     const activeRole = extractActiveRole(response);
+    const normalizedRoles = availableRoles.map(normalizeRoleName).filter(Boolean);
 
     setToken(response.token ?? (await authService.getToken()));
     setUsuario(user);
+    setTodosLosRoles(normalizedRoles);
 
     if (availableRoles.length > 1 && !activeRole) {
       setRol('');
@@ -123,21 +131,22 @@ export function AuthProvider({ children }) {
   };
 
   const handleSeleccionarRol = async (selectedRole) => {
-    const currentToken = await authService.getToken();
+    const currentToken = token ?? (await authService.getToken());
     const roleValue = normalizeRoleName(selectedRole);
+
     const response = await authService.seleccionarRol(roleValue, currentToken);
+
     const user = extractUser(response) ?? usuario;
     const activeRole = extractActiveRole(response) || roleValue;
 
-    setToken(response.token ?? (await authService.getToken()));
+    const newToken = response.token ?? (await authService.getToken());
+
+    setToken(newToken);
     setUsuario(user);
     setRol(activeRole);
     setPendingRoles([]);
 
-    return {
-      user,
-      rol: activeRole,
-    };
+    return { user, rol: activeRole };
   };
 
   const handleLogout = async () => {
@@ -146,7 +155,16 @@ export function AuthProvider({ children }) {
     setRol('');
     setToken(null);
     setPendingRoles([]);
+    setTodosLosRoles([]);
   };
+
+  // Registrar handler global para token expirado (401)
+  // Debe ir DESPUÉS de handleLogout para evitar TDZ
+  const logoutRef = useRef(handleLogout);
+  logoutRef.current = handleLogout;
+  useEffect(() => {
+    setUnauthorizedHandler(() => logoutRef.current());
+  }, []);
 
   const value = {
     usuario,
@@ -155,14 +173,12 @@ export function AuthProvider({ children }) {
     isLoading,
     isAuthenticated: Boolean(token && usuario),
     pendingRoles,
+    todosLosRoles,   // ← todos los roles del usuario, siempre disponible
     login: handleLogin,
     seleccionarRol: handleSeleccionarRol,
     logout: handleLogout,
     restoreSession: hydrateAuthState,
   };
-
-  // Debug logging
-  console.log('AuthContext - rol:', rol, 'usuario:', usuario);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

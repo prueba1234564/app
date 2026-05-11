@@ -6,6 +6,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SeleccionarRolScreen from '../screens/auth/SeleccionarRolScreen';
+import RegistroEstudianteScreen from '../screens/auth/RegistroEstudianteScreen';
+import RecuperarPasswordScreen from '../screens/auth/RecuperarPasswordScreen';
 import CarreraFormScreen from '../screens/decano/CarreraFormScreen';
 import CarrerasScreen from '../screens/decano/CarrerasScreen';
 import DashboardDecano from '../screens/decano/DashboardDecano';
@@ -40,6 +42,25 @@ import NotificacionesDocenteScreen from '../screens/docente/NotificacionesDocent
 import PerfilDocenteScreen from '../screens/docente/PerfilDocenteScreen';
 import HistorialScreen from '../screens/docente/HistorialScreen';
 
+import DashboardEstudiante from '../screens/estudiante/DashboardEstudiante';
+import MateriasEstudianteScreen from '../screens/estudiante/MateriasEstudianteScreen';
+import ActividadesEstudianteScreen from '../screens/estudiante/ActividadesEstudianteScreen';
+import NotificacionesEstudianteScreen from '../screens/estudiante/NotificacionesEstudianteScreen';
+import PerfilEstudianteScreen from '../screens/estudiante/PerfilEstudianteScreen';
+import HorarioEstudianteScreen from '../screens/estudiante/HorarioEstudianteScreen';
+import InscripcionesScreen from '../screens/estudiante/InscripcionesScreen';
+import CalendarioEstudianteScreen from '../screens/estudiante/CalendarioEstudianteScreen';
+
+import DashboardCentroEstudiantes from '../screens/centroEstudiantes/DashboardCentroEstudiantes';
+import PerfilCentroEstudiantesScreen from '../screens/centroEstudiantes/PerfilCentroEstudiantesScreen';
+import DocentesCentroScreen from '../screens/centroEstudiantes/DocentesScreen';
+import ActividadesCentroScreen from '../screens/centroEstudiantes/ActividadesCentroScreen';
+import NotificacionCentroScreen from '../screens/centroEstudiantes/NotificacionCentroScreen';
+import PeriodosCentroScreen from '../screens/centroEstudiantes/PeriodosCentroScreen';
+
+import DashboardCentroFacultativo from '../screens/centroFacultativo/DashboardCentroFacultativo';
+import PerfilCentroFacultativoScreen from '../screens/centroFacultativo/PerfilCentroFacultativoScreen';
+
 const Stack = createNativeStackNavigator();
 
 function LoadingScreen() {
@@ -54,6 +75,8 @@ function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="RegistroEstudiante" component={RegistroEstudianteScreen} />
+      <Stack.Screen name="RecuperarPassword" component={RecuperarPasswordScreen} />
       <Stack.Screen
         name="SeleccionarRol"
         component={SeleccionarRolScreen}
@@ -103,6 +126,51 @@ function DocenteStack() {
   );
 }
 
+function EstudianteStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="DashboardEstudiante"    component={DashboardEstudiante}           options={{ headerShown: false }} />
+      <Stack.Screen name="MateriasEstudiante"     component={MateriasEstudianteScreen}      options={{ headerShown: false }} />
+      <Stack.Screen name="HorarioEstudiante"      component={HorarioEstudianteScreen}       options={{ headerShown: false }} />
+      <Stack.Screen name="CalendarioEstudiante"   component={CalendarioEstudianteScreen}    options={{ headerShown: false }} />
+      <Stack.Screen name="ActividadesEstudiante"  component={ActividadesEstudianteScreen}   options={{ headerShown: false }} />
+      <Stack.Screen name="NotificacionesEstudiante" component={NotificacionesEstudianteScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PerfilEstudiante"       component={PerfilEstudianteScreen}        options={{ headerShown: false }} />
+      <Stack.Screen name="InscripcionesEstudiante" component={InscripcionesScreen}          options={{ headerShown: false }} />
+    </Stack.Navigator>
+  );
+}
+
+function CentroEstudiantesStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="DashboardCentro"    component={DashboardCentroEstudiantes}  options={{ headerShown: false }} />
+      <Stack.Screen name="PerfilCentro"       component={PerfilCentroEstudiantesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DocentesCentro"     component={DocentesCentroScreen}        options={{ headerShown: false }} />
+      <Stack.Screen name="ActividadesCentro"  component={ActividadesCentroScreen}     options={{ headerShown: false }} />
+      <Stack.Screen name="NotificacionCentro" component={NotificacionCentroScreen}    options={{ headerShown: false }} />
+      <Stack.Screen name="PeriodosCentro"     component={PeriodosCentroScreen}        options={{ headerShown: false }} />
+    </Stack.Navigator>
+  );
+}
+
+function CentroFacultativoStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="DashboardFacultativo"
+        component={DashboardCentroFacultativo}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PerfilFacultativo"
+        component={PerfilCentroFacultativoScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 function DecanoStack() {
   return (
     <Stack.Navigator>
@@ -135,21 +203,23 @@ export default function AppNavigator() {
     return <LoadingScreen />;
   }
 
+  const rolNorm = rol?.toLowerCase() ?? '';
+
+  const renderStack = () => {
+    if (!isAuthenticated) return <AuthStack />;
+    if (pendingRoles.length > 1 && !rol) return <AuthStack />;
+    if (rolNorm === 'decano')             return <DecanoStack />;
+    if (rolNorm === 'director')           return <DirectorStack />;
+    if (rolNorm === 'docente')            return <DocenteStack />;
+    if (rolNorm === 'estudiante')         return <EstudianteStack />;
+    if (rolNorm === 'centro_estudiantes') return <CentroEstudiantesStack />;
+    if (rolNorm === 'centro_facultativo') return <CentroFacultativoStack />;
+    return <AuthStack />;
+  };
+
   return (
-    <NavigationContainer>
-      {!isAuthenticated ? (
-        <AuthStack />
-      ) : pendingRoles.length > 1 && !rol ? (
-        <AuthStack />
-      ) : rol?.toLowerCase() === 'decano' ? (
-        <DecanoStack />
-      ) : rol?.toLowerCase() === 'director' ? (
-        <DirectorStack />
-      ) : rol?.toLowerCase() === 'docente' ? (
-        <DocenteStack />
-      ) : (
-        <AuthStack />
-      )}
+    <NavigationContainer key={`nav-${rolNorm || 'auth'}`}>
+      {renderStack()}
     </NavigationContainer>
   );
 }

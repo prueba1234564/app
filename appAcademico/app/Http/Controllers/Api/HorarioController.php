@@ -28,6 +28,10 @@ class HorarioController extends Controller
                 return response()->json(['success' => false, 'message' => 'Oferta no encontrada.'], 404);
             }
 
+            if (!$oferta->materia_id) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
             $horarios = Horario::where('materia_id', $oferta->materia_id)
                 ->orderByRaw("FIELD(dia, 'lunes','martes','miercoles','jueves','viernes','sabado')")
                 ->orderBy('hora_inicio')
@@ -35,7 +39,7 @@ class HorarioController extends Controller
 
             return response()->json(['success' => true, 'data' => $horarios]);
         } catch (Throwable $e) {
-            return response()->json(['success' => false, 'message' => 'Error al obtener horarios.'], 500);
+            return response()->json(['success' => false, 'message' => 'Error al obtener horarios: ' . $e->getMessage()], 500);
         }
     }
 
@@ -50,6 +54,11 @@ class HorarioController extends Controller
 
             if (!$oferta->periodo?->activo) {
                 return $this->periodoCerradoResponse();
+            }
+
+            // Verificar que la materia existe
+            if (!$oferta->materia) {
+                return response()->json(['success' => false, 'message' => 'La materia de esta oferta no existe.'], 404);
             }
 
             // Verificar que el director es dueño de esta oferta

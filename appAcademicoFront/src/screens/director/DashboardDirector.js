@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import BottomNav from '../../components/BottomNav';
+import { SkeletonList, SkeletonStatCard } from '../../components/SkeletonLoader';
 
 // Módulos específicos para Director - solo su carrera
 const MODULES = [
@@ -28,6 +29,8 @@ export default function DashboardDirector({ navigation }) {
   const [notificacionesEnviadas, setNotificacionesEnviadas] = useState([]);
   const [loadingNotificaciones, setLoadingNotificaciones] = useState(false);
 
+  const [isOffline, setIsOffline] = useState(false);
+
   useEffect(() => {
     loadStats();
     loadNotificaciones();
@@ -45,16 +48,27 @@ export default function DashboardDirector({ navigation }) {
     try {
       setLoading(true);
       setError(null);
-      // Cargar estadísticas específicas de la carrera del director
+      setIsOffline(false);
       const response = await api.get('/dashboard/director-stats');
       if (response.data?.success) {
         setStats(response.data.data);
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.setItem('cache_stats_director', JSON.stringify({ data: response.data.data, ts: Date.now() }));
       } else {
         setError('No se pudieron cargar los datos');
       }
-    } catch (error) {
-      console.error('Error loading stats:', error);
-      setError('Error de conexión con el servidor');
+    } catch {
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const raw = await AsyncStorage.getItem('cache_stats_director');
+        if (raw) {
+          const { data } = JSON.parse(raw);
+          setStats(data);
+          setIsOffline(true);
+        } else {
+          setError('Sin conexión y sin datos guardados.');
+        }
+      } catch { setError('Error de conexión con el servidor'); }
     } finally {
       setLoading(false);
     }
@@ -101,7 +115,12 @@ export default function DashboardDirector({ navigation }) {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Header Premium */}
+        {isOffline && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineText}>📶 Sin conexión — datos guardados</Text>
+          </View>
+        )}
+        {/* Header Premium */}}
         <View style={styles.header}>
           {/* Elementos decorativos de fondo */}
           <View style={styles.headerCircle1} />
@@ -160,7 +179,12 @@ export default function DashboardDirector({ navigation }) {
         </View>
         
         {loading ? (
-          <ActivityIndicator size="large" color="#8A220B" style={{ marginVertical: 30 }} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 10 }}>
+            <SkeletonStatCard style={{ width: '48%', marginBottom: 14 }} />
+            <SkeletonStatCard style={{ width: '48%', marginBottom: 14 }} />
+            <SkeletonStatCard style={{ width: '48%', marginBottom: 14 }} />
+            <SkeletonStatCard style={{ width: '48%', marginBottom: 14 }} />
+          </View>
         ) : error ? (
           <View style={styles.errorContainer}>
             <Ionicons name="cloud-offline-outline" size={48} color="#8A220B" />
@@ -799,13 +823,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  logoutText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  
-  // Error Container
+  logoutText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  offlineBanner: { backgroundColor: '#fef3c7', borderRadius: 12, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fde68a' },
+  offlineText: { color: '#92400e', fontWeight: '700', fontSize: 13 },
   errorContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 20,

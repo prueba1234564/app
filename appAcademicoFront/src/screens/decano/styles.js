@@ -144,6 +144,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
+
+  // Role checkboxes
+  roleCheckbox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1.5,
+    borderColor: '#d0d7de',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+  },
+  roleCheckboxSelected: {
+    borderColor: '#2E86AB',
+    backgroundColor: '#eff8ff',
+  },
+  roleCheckboxDisabled: {
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    opacity: 0.5,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#d0d7de',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxSelected: {
+    backgroundColor: '#2E86AB',
+    borderColor: '#2E86AB',
+  },
+  roleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2933',
+  },
 });
 
 export default styles;

@@ -20,7 +20,7 @@ import HeaderConfigButton from '../../components/HeaderConfigButton';
 
 const ROLES = [
   { key: 'todos', label: 'Todos', color: '#4f46e5' },
-  { key: 'director', label: 'Directores', color: '#7c3aed' },
+  { key: 'director', label: 'Directores', color: '#0f172a' },
   { key: 'docente', label: 'Docentes', color: '#0f766e' },
   { key: 'estudiante', label: 'Estudiantes', color: '#be123c' },
   { key: 'decano', label: 'Decanos', color: '#1A1A4E' },

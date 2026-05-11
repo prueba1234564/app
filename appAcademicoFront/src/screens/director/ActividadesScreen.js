@@ -42,7 +42,7 @@ const getCategoriaStyle = (categoria) => {
     // estilos de solo lectura para actividades creadas por docentes
     parcial:    { bg: "#fee2e2", text: "#dc2626", icon: "document-text" },
     tarea:      { bg: "#fef3c7", text: "#d97706", icon: "pencil" },
-    proyecto:   { bg: "#ede9fe", text: "#7c3aed", icon: "construct" },
+    proyecto:   { bg: "#ede9fe", text: "#0f172a", icon: "construct" },
   };
   return map[categoria] || map.comunicado;
 };

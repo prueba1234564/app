@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Actividad;
+use App\Models\ActividadCompletada;
 use App\Models\Notificacion;
 use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -19,25 +20,38 @@ class ActividadController extends Controller
         try {
             $query = Actividad::with(['creador', 'materia', 'carrera']);
             
-            // Filtros
             if ($request->has('categoria') && $request->categoria) {
                 $query->where('categoria', $request->categoria);
             }
-            
             if ($request->has('carrera_id') && $request->carrera_id) {
                 $query->where('carrera_id', $request->carrera_id);
             }
-            
             if ($request->has('rol_destino') && $request->rol_destino) {
                 $query->where('rol_destino', $request->rol_destino);
             }
-            
-            // Ordenar por fecha de entrega (las más próximas primero)
             $query->orderBy('fecha_entrega', 'asc');
-            
+
+            $actividades = $query->get();
+
+            // Si el usuario es estudiante, añadir campo "completada"
+            $usuario = $request->user();
+            $habilidades = $usuario?->currentAccessToken()?->abilities ?? [];
+            $rolActivo = collect($habilidades)->first(fn (string $h) => $h !== '*');
+
+            if ($rolActivo === 'estudiante') {
+                $completadasIds = ActividadCompletada::where('usuario_id', $usuario->id)
+                    ->pluck('actividad_id')
+                    ->toArray();
+
+                $actividades = $actividades->map(function ($act) use ($completadasIds) {
+                    $act->completada = in_array($act->id, $completadasIds);
+                    return $act;
+                });
+            }
+
             return response()->json([
                 'success' => true,
-                'data' => $query->get(),
+                'data' => $actividades,
             ], 200);
         } catch (Throwable $e) {
             return response()->json([
@@ -215,6 +229,52 @@ class ActividadController extends Controller
                 'success' => false,
                 'message' => 'Error del servidor.',
             ], 500);
+        }
+    }
+
+    /**
+     * POST /estudiante/actividades/{id}/completar
+     * Marca una actividad como completada por el estudiante autenticado.
+     */
+    public function completar(Request $request, int $id): JsonResponse
+    {
+        try {
+            $actividad = Actividad::find($id);
+            if (!$actividad) {
+                return response()->json(['success' => false, 'message' => 'Actividad no encontrada.'], 404);
+            }
+
+            $usuario = $request->user();
+
+            ActividadCompletada::firstOrCreate([
+                'usuario_id'   => $usuario->id,
+                'actividad_id' => $id,
+            ], [
+                'completada_en' => now(),
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Actividad marcada como completada.']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Error al completar actividad.'], 500);
+        }
+    }
+
+    /**
+     * DELETE /estudiante/actividades/{id}/completar
+     * Desmarca una actividad como completada.
+     */
+    public function descompletar(Request $request, int $id): JsonResponse
+    {
+        try {
+            $usuario = $request->user();
+
+            ActividadCompletada::where('usuario_id', $usuario->id)
+                ->where('actividad_id', $id)
+                ->delete();
+
+            return response()->json(['success' => true, 'message' => 'Actividad desmarcada.']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Error al desmarcar actividad.'], 500);
         }
     }
 

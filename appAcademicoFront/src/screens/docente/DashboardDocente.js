@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../../context/AuthContext';
 import { getActividadesPorMateria, getMisMaterias } from '../../services/docenteService';
 import DocenteBottomNav from '../../components/DocenteBottomNav';
+import { SkeletonList, SkeletonStatCard } from '../../components/SkeletonLoader';
 
 const formatDate = (value) => {
   if (!value) return 'Sin fecha';
@@ -19,13 +20,30 @@ export default function DashboardDocente({ navigation }) {
   const [actividades, setActividades] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [isOffline, setIsOffline] = useState(false);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setIsOffline(false);
       const misMaterias = await getMisMaterias();
       setMaterias(misMaterias);
       const listas = await Promise.all(misMaterias.map((materia) => getActividadesPorMateria(materia.id)));
-      setActividades(listas.flat());
+      const acts = listas.flat();
+      setActividades(acts);
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      await AsyncStorage.setItem('cache_dashboard_doc', JSON.stringify({ misMaterias, acts, ts: Date.now() }));
+    } catch {
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const raw = await AsyncStorage.getItem('cache_dashboard_doc');
+        if (raw) {
+          const { misMaterias, acts } = JSON.parse(raw);
+          setMaterias(misMaterias || []);
+          setActividades(acts || []);
+          setIsOffline(true);
+        }
+      } catch {}
     } finally {
       setLoading(false);
     }
@@ -44,12 +62,26 @@ export default function DashboardDocente({ navigation }) {
     .slice(0, 3);
 
   if (loading) {
-    return <View style={styles.loading}><ActivityIndicator size="large" color="#2E86AB" /></View>;
+    return (
+      <SafeAreaView style={styles.screen}>
+        <View style={{ padding: 20, gap: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <SkeletonStatCard /><SkeletonStatCard />
+          </View>
+          <SkeletonList count={3} />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {isOffline && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineText}>📶 Sin conexión — datos guardados</Text>
+          </View>
+        )}
         <View style={styles.header}>
           <View style={styles.circleOne} />
           <View style={styles.circleTwo} />
@@ -138,4 +170,6 @@ const styles = StyleSheet.create({
   activityMeta: { marginTop: 3, color: '#64748b', fontSize: 12, textTransform: 'capitalize' },
   empty: { backgroundColor: '#fff', borderRadius: 18, padding: 22, alignItems: 'center' },
   emptyText: { color: '#64748b', fontWeight: '600' },
+  offlineBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fef3c7', borderRadius: 12, padding: 10, marginBottom: 12, marginHorizontal: 20, borderWidth: 1, borderColor: '#fde68a' },
+  offlineText: { color: '#92400e', fontWeight: '700', fontSize: 13 },
 });

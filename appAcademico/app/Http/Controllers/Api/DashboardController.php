@@ -130,18 +130,6 @@ class DashboardController extends Controller
         }
 
         $carrera = Carrera::with(['facultad', 'materias'])
-            ->withCount([
-                'usuarios as total_estudiantes' => function ($query) {
-                    $query->whereHas('rolesUsuario', function ($q) {
-                        $q->where('rol', 'estudiante');
-                    });
-                },
-                'usuarios as total_docentes' => function ($query) {
-                    $query->whereHas('rolesUsuario', function ($q) {
-                        $q->where('rol', 'docente');
-                    });
-                }
-            ])
             ->find($carreraId);
 
         if (!$carrera) {
@@ -151,25 +139,45 @@ class DashboardController extends Controller
             ], 404);
         }
 
-        // Estadísticas de la carrera
-        $totalEstudiantes = $carrera->total_estudiantes;
-        $totalDocentes = $carrera->total_docentes;
+        // Contar directamente desde roles_usuario para mayor precisión
+        // Un estudiante pertenece a la carrera si su rol tiene carrera_id = $carreraId
+        // O si su usuario.carrera_id = $carreraId
+        $totalEstudiantes = \App\Models\RolUsuario::where('rol', 'estudiante')
+            ->where(function ($q) use ($carreraId) {
+                $q->where('carrera_id', $carreraId)
+                  ->orWhereHas('usuario', fn ($u) => $u->where('carrera_id', $carreraId));
+            })
+            ->distinct('usuario_id')
+            ->count('usuario_id');
+
+        $totalDocentes = \App\Models\RolUsuario::where('rol', 'docente')
+            ->where(function ($q) use ($carreraId) {
+                $q->where('carrera_id', $carreraId)
+                  ->orWhereHas('usuario', fn ($u) => $u->where('carrera_id', $carreraId));
+            })
+            ->distinct('usuario_id')
+            ->count('usuario_id');
+
         $totalMaterias = $carrera->materias->count();
 
         // Usuarios nuevos este mes en la carrera
-        $estudiantesNuevos = \App\Models\Usuario::where('carrera_id', $carreraId)
-            ->whereHas('rolesUsuario', function ($q) {
-                $q->where('rol', 'estudiante');
+        $estudiantesNuevos = \App\Models\RolUsuario::where('rol', 'estudiante')
+            ->where(function ($q) use ($carreraId) {
+                $q->where('carrera_id', $carreraId)
+                  ->orWhereHas('usuario', fn ($u) => $u->where('carrera_id', $carreraId));
             })
             ->whereMonth('created_at', now()->month)
-            ->count();
+            ->distinct('usuario_id')
+            ->count('usuario_id');
 
-        $docentesNuevos = \App\Models\Usuario::where('carrera_id', $carreraId)
-            ->whereHas('rolesUsuario', function ($q) {
-                $q->where('rol', 'docente');
+        $docentesNuevos = \App\Models\RolUsuario::where('rol', 'docente')
+            ->where(function ($q) use ($carreraId) {
+                $q->where('carrera_id', $carreraId)
+                  ->orWhereHas('usuario', fn ($u) => $u->where('carrera_id', $carreraId));
             })
             ->whereMonth('created_at', now()->month)
-            ->count();
+            ->distinct('usuario_id')
+            ->count('usuario_id');
 
         // Actividad mensual
         $actividadMensual = min(95, round((($estudiantesNuevos + $docentesNuevos) / max($totalEstudiantes + $totalDocentes, 1)) * 100 + 85));
@@ -247,18 +255,15 @@ class DashboardController extends Controller
 
     private function getDirectorCarrera(string $carreraNombre): string
     {
-        $directores = [
-            'Ingeniería en Sistemas' => 'Dr. Roberto Sánchez',
-            'Ingeniería Civil' => 'Dr. Carlos Ruiz',
-            'Ingeniería Industrial' => 'Dra. María González',
-            'Ingeniería Eléctrica' => 'Dr. Javier Mendoza',
-            'Ingeniería Mecánica' => 'Dr. Andrés Vega',
-            'Derecho' => 'Dra. Patricia Flores',
-            'Medicina' => 'Dr. Luis Hernández',
-            'Psicología' => 'Dra. Carmen Silva',
-        ];
+        $carrera = \App\Models\Carrera::where('nombre', $carreraNombre)->first();
+        if (!$carrera) return 'Por asignar';
 
-        return $directores[$carreraNombre] ?? 'Por asignar';
+        $director = \App\Models\RolUsuario::where('rol', 'director')
+            ->where('carrera_id', $carrera->id)
+            ->with('usuario:id,nombre')
+            ->first();
+
+        return $director?->usuario?->nombre ?? 'Por asignar';
     }
 
     private function formatTiempo($fecha): string

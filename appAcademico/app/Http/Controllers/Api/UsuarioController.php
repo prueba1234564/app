@@ -117,12 +117,17 @@ class UsuarioController extends Controller
                 ], 422);
             }
 
-            // Docente es incompatible con estudiante y centro_estudiantes
-            if (in_array('docente', $rolesArray) && count($rolesArray) > 1) {
-                return response()->json([
-                    'message' => 'Error de validacion.',
-                    'errors' => ['roles' => ['El rol docente no puede combinarse con otros roles.']],
-                ], 422);
+            // Docente es incompatible con roles de estudiante/centro
+            // Pero sí puede combinarse con director o decano
+            $rolesIncompatiblesConDocente = ['estudiante', 'centro_estudiantes', 'centro_facultativo'];
+            if (in_array('docente', $rolesArray)) {
+                $conflictos = array_intersect($rolesArray, $rolesIncompatiblesConDocente);
+                if (!empty($conflictos)) {
+                    return response()->json([
+                        'message' => 'Error de validacion.',
+                        'errors' => ['roles' => ['El rol docente no puede combinarse con roles de estudiante o centro.']],
+                    ], 422);
+                }
             }
             
             // Si es director, verificar que no intente asignar a otra carrera
@@ -142,7 +147,7 @@ class UsuarioController extends Controller
                     'email'                   => $data['email'],
                     'registro_universitario'  => $data['registro_universitario'] ?? null,
                     'password'                => Hash::make($data['password']),
-                    'esta_verificado'         => false,
+                    'esta_verificado'         => true, // Admin crea usuarios ya verificados
                     'carrera_id'              => $data['carrera_id'] ?? null,
                     'facultad_id'             => $data['facultad_id'] ?? null,
                 ]);
@@ -228,6 +233,27 @@ class UsuarioController extends Controller
             }
 
             $data = $validator->validated();
+
+            // Validar combinaciones de roles incompatibles
+            $rolesParaValidar = [];
+            if (!empty($data['roles'])) {
+                $rolesParaValidar = array_unique($data['roles']);
+            } elseif (!empty($data['rol'])) {
+                $rolesParaValidar = [$data['rol']];
+            }
+
+            if (!empty($rolesParaValidar)) {
+                $rolesIncompatiblesConDocente = ['estudiante', 'centro_estudiantes', 'centro_facultativo'];
+                if (in_array('docente', $rolesParaValidar)) {
+                    $conflictos = array_intersect($rolesParaValidar, $rolesIncompatiblesConDocente);
+                    if (!empty($conflictos)) {
+                        return response()->json([
+                            'message' => 'Error de validacion.',
+                            'errors' => ['roles' => ['El rol docente no puede combinarse con roles de estudiante o centro.']],
+                        ], 422);
+                    }
+                }
+            }
 
             $usuario = DB::transaction(function () use ($data, $usuario) {
                 $payload = [

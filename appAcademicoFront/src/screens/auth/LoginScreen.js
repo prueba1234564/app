@@ -114,6 +114,23 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.buttonText}>Iniciar Sesión</Text>
             )}
           </Pressable>
+
+          {/* Registro de estudiantes */}
+          <Pressable
+            style={styles.registerBtn}
+            onPress={() => navigation.navigate('RegistroEstudiante')}
+          >
+            <Ionicons name="person-add-outline" size={16} color="#6366f1" />
+            <Text style={styles.registerText}>¿Eres estudiante? Regístrate aquí</Text>
+          </Pressable>
+
+          {/* Recuperar contraseña */}
+          <Pressable
+            style={styles.forgotBtn}
+            onPress={() => navigation.navigate('RecuperarPassword')}
+          >
+            <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+          </Pressable>
         </View>
 
         {/* Texto inferior sutil */}
@@ -268,4 +285,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
+  registerBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, marginTop: 16, paddingVertical: 12,
+    borderWidth: 1, borderColor: 'rgba(99,102,241,0.3)',
+    borderRadius: 14, backgroundColor: 'rgba(99,102,241,0.08)',
+  },
+  registerText: { color: '#6366f1', fontSize: 14, fontWeight: '700' },
+  forgotBtn: { alignItems: 'center', marginTop: 12, paddingVertical: 8 },
+  forgotText: { color: '#64748b', fontSize: 13, fontWeight: '600' },
 });

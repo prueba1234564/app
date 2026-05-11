@@ -1097,7 +1097,7 @@ const getRolStyle = (rol) => {
     case 'docentes': return { bg: '#fffbeb', text: '#d97706', accent: '#f59e0b' };
     case 'estudiantes': return { bg: '#ecfdf5', text: '#059669', accent: '#10b981' };
     case 'centro_facultativo': 
-    case 'centro_estudiantes': return { bg: '#faf5ff', text: '#7c3aed', accent: '#8b5cf6' };
+    case 'centro_estudiantes': return { bg: '#faf5ff', text: '#0f172a', accent: '#8b5cf6' };
     default: return { bg: '#f1f5f9', text: '#475569', accent: '#94a3b8' };
   }
 };

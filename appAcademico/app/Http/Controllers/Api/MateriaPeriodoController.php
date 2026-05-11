@@ -90,14 +90,29 @@ class MateriaPeriodoController extends Controller
                 return $this->periodoCerradoResponse();
             }
 
+            // Verificar duplicado: misma materia + mismo paralelo en el mismo periodo
+            // Se permite la misma materia con diferente paralelo (ej: Programación A, Programación B)
+            $paralelo = $request->paralelo ?? null;
             $exists = MateriaPeriodo::where('periodo_id', $request->periodo_id)
                 ->where('materia_id', $request->materia_id)
+                ->where(function ($q) use ($paralelo) {
+                    if ($paralelo) {
+                        // Si viene paralelo, verificar que no exista el mismo paralelo para esa materia
+                        $q->where('paralelo', $paralelo);
+                    } else {
+                        // Si no viene paralelo, verificar que no exista ya una entrada sin paralelo
+                        $q->whereNull('paralelo');
+                    }
+                })
                 ->exists();
 
             if ($exists) {
+                $msg = $paralelo
+                    ? "La materia ya tiene un paralelo \"{$paralelo}\" en este período."
+                    : 'La materia ya está asignada a este período sin paralelo.';
                 return response()->json([
                     'success' => false,
-                    'message' => 'La materia ya está asignada a este período.',
+                    'message' => $msg,
                 ], 422);
             }
 

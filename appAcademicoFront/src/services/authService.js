@@ -26,7 +26,6 @@ const normalizeToken = (payload) =>
   null;
 
 export const login = async (email, password) => {
-  console.log('Enviando:', { email, password });
   const response = await api.post('/auth/login', { email, password });
   const data = response.data;
   const token = normalizeToken(data);
@@ -44,12 +43,14 @@ export const login = async (email, password) => {
 };
 
 export const seleccionarRol = async (rol, token) => {
-  const tempToken = token ?? (await AsyncStorage.getItem(TOKEN_KEY));
+  // Usar el token pasado como parámetro, o leer del storage como fallback
+  const authToken = token ?? (await AsyncStorage.getItem(TOKEN_KEY));
+
   const response = await api.post(
     '/auth/seleccionar-rol',
     { rol },
     {
-      headers: tempToken ? { Authorization: `Bearer ${tempToken}` } : undefined,
+      headers: { Authorization: `Bearer ${authToken}` },
     }
   );
 
