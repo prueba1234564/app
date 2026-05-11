@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import BottomNav from '../../components/BottomNav';
@@ -52,14 +53,12 @@ export default function DashboardDirector({ navigation }) {
       const response = await api.get('/dashboard/director-stats');
       if (response.data?.success) {
         setStats(response.data.data);
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
         await AsyncStorage.setItem('cache_stats_director', JSON.stringify({ data: response.data.data, ts: Date.now() }));
       } else {
         setError('No se pudieron cargar los datos');
       }
     } catch {
       try {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
         const raw = await AsyncStorage.getItem('cache_stats_director');
         if (raw) {
           const { data } = JSON.parse(raw);
