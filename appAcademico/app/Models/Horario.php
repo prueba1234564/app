@@ -14,6 +14,7 @@ class Horario extends Model
 
     protected $fillable = [
         'materia_id',
+        'materia_periodo_id',
         'dia',
         'hora_inicio',
         'hora_fin',

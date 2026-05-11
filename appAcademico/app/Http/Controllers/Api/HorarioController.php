@@ -28,11 +28,8 @@ class HorarioController extends Controller
                 return response()->json(['success' => false, 'message' => 'Oferta no encontrada.'], 404);
             }
 
-            if (!$oferta->materia_id) {
-                return response()->json(['success' => true, 'data' => []]);
-            }
-
-            $horarios = Horario::where('materia_id', $oferta->materia_id)
+            // Buscar primero por materia_periodo_id (más específico), luego por materia_id
+            $horarios = Horario::where('materia_periodo_id', $materiaPeriodoId)
                 ->orderByRaw("CASE dia
                     WHEN 'lunes'     THEN 1
                     WHEN 'martes'    THEN 2
@@ -43,6 +40,22 @@ class HorarioController extends Controller
                     ELSE 7 END")
                 ->orderBy('hora_inicio')
                 ->get();
+
+            // Fallback: si no hay horarios por materia_periodo_id, buscar por materia_id
+            if ($horarios->isEmpty() && $oferta->materia_id) {
+                $horarios = Horario::where('materia_id', $oferta->materia_id)
+                    ->whereNull('materia_periodo_id')
+                    ->orderByRaw("CASE dia
+                        WHEN 'lunes'     THEN 1
+                        WHEN 'martes'    THEN 2
+                        WHEN 'miercoles' THEN 3
+                        WHEN 'jueves'    THEN 4
+                        WHEN 'viernes'   THEN 5
+                        WHEN 'sabado'    THEN 6
+                        ELSE 7 END")
+                    ->orderBy('hora_inicio')
+                    ->get();
+            }
 
             return response()->json(['success' => true, 'data' => $horarios]);
         } catch (Throwable $e) {
@@ -83,11 +96,12 @@ class HorarioController extends Controller
             ]);
 
             $horario = Horario::create([
-                'materia_id'  => $oferta->materia_id,
-                'dia'         => $data['dia'],
-                'hora_inicio' => $data['hora_inicio'],
-                'hora_fin'    => $data['hora_fin'],
-                'aula'        => $data['aula'] ?? null,
+                'materia_id'         => $oferta->materia_id,
+                'materia_periodo_id' => $materiaPeriodoId,
+                'dia'                => $data['dia'],
+                'hora_inicio'        => $data['hora_inicio'],
+                'hora_fin'           => $data['hora_fin'],
+                'aula'               => $data['aula'] ?? null,
             ]);
 
             return response()->json(['success' => true, 'data' => $horario], 201);
