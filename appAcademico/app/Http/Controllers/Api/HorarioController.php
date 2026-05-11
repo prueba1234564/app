@@ -33,12 +33,20 @@ class HorarioController extends Controller
             }
 
             $horarios = Horario::where('materia_id', $oferta->materia_id)
-                ->orderByRaw("FIELD(dia, 'lunes','martes','miercoles','jueves','viernes','sabado')")
+                ->orderByRaw("CASE dia
+                    WHEN 'lunes'     THEN 1
+                    WHEN 'martes'    THEN 2
+                    WHEN 'miercoles' THEN 3
+                    WHEN 'jueves'    THEN 4
+                    WHEN 'viernes'   THEN 5
+                    WHEN 'sabado'    THEN 6
+                    ELSE 7 END")
                 ->orderBy('hora_inicio')
                 ->get();
 
             return response()->json(['success' => true, 'data' => $horarios]);
         } catch (Throwable $e) {
+            \Log::error('HorarioController::index error: ' . $e->getMessage() . ' | ' . $e->getFile() . ':' . $e->getLine());
             return response()->json(['success' => false, 'message' => 'Error al obtener horarios: ' . $e->getMessage()], 500);
         }
     }
