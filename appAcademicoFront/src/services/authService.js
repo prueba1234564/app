@@ -1,6 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 import api from '../api/axios';
+
+const storage = {
+  getItem: async (key) => {
+    if (Platform.OS === 'web') return localStorage.getItem(key);
+    return AsyncStorage.getItem(key);
+  },
+  setItem: async (key, value) => {
+    if (Platform.OS === 'web') { localStorage.setItem(key, value); return; }
+    return AsyncStorage.setItem(key, value);
+  },
+  removeItem: async (key) => {
+    if (Platform.OS === 'web') { localStorage.removeItem(key); return; }
+    return AsyncStorage.removeItem(key);
+  },
+};
 
 const TOKEN_KEY = 'token';
 
@@ -31,7 +47,7 @@ export const login = async (email, password) => {
   const token = normalizeToken(data);
 
   if (token) {
-    await AsyncStorage.setItem(TOKEN_KEY, token);
+    await storage.setItem(TOKEN_KEY, token);
   }
 
   return {
@@ -44,7 +60,7 @@ export const login = async (email, password) => {
 
 export const seleccionarRol = async (rol, token) => {
   // Usar el token pasado como parámetro, o leer del storage como fallback
-  const authToken = token ?? (await AsyncStorage.getItem(TOKEN_KEY));
+  const authToken = token ?? (await storage.getItem(TOKEN_KEY));
 
   const response = await api.post(
     '/auth/seleccionar-rol',
@@ -58,7 +74,7 @@ export const seleccionarRol = async (rol, token) => {
   const finalToken = normalizeToken(data);
 
   if (finalToken) {
-    await AsyncStorage.setItem(TOKEN_KEY, finalToken);
+    await storage.setItem(TOKEN_KEY, finalToken);
   }
 
   return {
@@ -70,7 +86,7 @@ export const seleccionarRol = async (rol, token) => {
 };
 
 export const logout = async () => {
-  await AsyncStorage.removeItem(TOKEN_KEY);
+  await storage.removeItem(TOKEN_KEY);
 };
 
 export const getMe = async () => {
@@ -78,7 +94,7 @@ export const getMe = async () => {
   return response.data;
 };
 
-export const getToken = async () => AsyncStorage.getItem(TOKEN_KEY);
+export const getToken = async () => storage.getItem(TOKEN_KEY);
 
 export default {
   login,
