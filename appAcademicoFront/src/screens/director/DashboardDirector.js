@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
@@ -120,7 +120,7 @@ export default function DashboardDirector({ navigation }) {
             <Text style={styles.offlineText}>📶 Sin conexión — datos guardados</Text>
           </View>
         )}
-        {/* Header Premium */}}
+        {/* Header Premium */}
         <View style={styles.header}>
           {/* Elementos decorativos de fondo */}
           <View style={styles.headerCircle1} />
